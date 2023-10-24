@@ -43,7 +43,7 @@ class LCMGenerator:
         self,
         *,
         device: str | None = None,
-        fp16=False,
+        fp16: bool = bool(os.environ.get("LCM_FP16")),
         progress_context=default_progress_context,
     ):
         if not device:

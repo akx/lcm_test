@@ -1,3 +1,5 @@
+import time
+
 import streamlit as st
 
 from lcm_gen import LCMGenerator
@@ -34,6 +36,7 @@ with st.form("generator"):
         help="0 for random",
     )
     if st.form_submit_button("Generate"):
+        t0 = time.time()
         result = get_generator().generate(
             prompt=prompt,
             width=width,
@@ -43,6 +46,12 @@ with st.form("generator"):
             steps=steps,
             seed=seed,
         )
+        gen_time = time.time() - t0
         st.write("Seed:", result.seed)
         for image in result.images:
             st.image(image)
+        st.write(
+            f"Time: {gen_time :.2f}s "
+            f"({gen_time / batch_size :.2f}s per image, "
+            f"{gen_time / batch_size / steps :.2f} seconds per step)",
+        )
