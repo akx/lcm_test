@@ -27,7 +27,23 @@ with st.form("generator"):
         value=9.0,
         help="Creativity, more or less",
     )
-    batch_size = st.number_input("Batch size", min_value=1, max_value=10, value=1)
+    sc, cc = st.columns(2)
+    with sc:
+        batch_size = st.number_input(
+            "Batch size",
+            min_value=1,
+            max_value=10,
+            value=1,
+            help="Number of images to generate per batch",
+        )
+    with cc:
+        batch_count = st.number_input(
+            "Batch count",
+            min_value=1,
+            max_value=10,
+            value=1,
+            help="Number of batches to generate",
+        )
     seed = st.number_input(
         "Seed",
         min_value=0,
@@ -37,21 +53,23 @@ with st.form("generator"):
     )
     if st.form_submit_button("Generate"):
         t0 = time.time()
-        result = get_generator().generate(
+        gen_time = time.time() - t0
+        n_images = 0
+        for result in get_generator().generate(
             prompt=prompt,
             width=width,
             height=height,
             batch_size=batch_size,
+            batch_count=batch_count,
             cfg=cfg,
             steps=steps,
             seed=seed,
-        )
-        gen_time = time.time() - t0
-        st.write("Seed:", result.seed)
-        for image in result.images:
-            st.image(image)
+        ):
+            st.write("Seed:", result.seed)
+            st.image(result.image)
+            n_images += 1
         st.write(
             f"Time: {gen_time :.2f}s "
-            f"({gen_time / batch_size :.2f}s per image, "
-            f"{gen_time / batch_size / steps :.2f} seconds per step)",
+            f"({gen_time / n_images :.2f}s per image, "
+            f"{gen_time / n_images / steps :.2f} seconds per step)",
         )

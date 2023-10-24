@@ -4,6 +4,7 @@ import random
 import sys
 from contextlib import contextmanager
 from functools import partial
+from typing import Iterable
 from unittest.mock import patch
 
 import torch
@@ -26,9 +27,12 @@ def get_best_device() -> str:
 
 
 @dataclasses.dataclass
-class Result:
+class ResultImage:
     seed: int
-    images: list[Image]
+    batch_num: int
+    batch_index: int
+    batch_count: int
+    image: Image
 
 
 @contextmanager
@@ -76,25 +80,36 @@ class LCMGenerator:
         steps: int,
         cfg: float,
         batch_size: int = 1,
+        batch_count: int = 1,
         seed: int | None = None,
-    ) -> Result:
+    ) -> Iterable[ResultImage]:
+        if not seed or seed <= 0:
+            seed = random.randint(0, 2**32)
         pipe: DiffusionPipeline = self.pipe
-        with self.progress_context(
-            f"Generating {batch_size} images ({self.device}, {self.dtype})...",
-        ):
-            if not seed or seed <= 0:
-                seed = random.randint(0, 2**32)
-            gen = torch.Generator(device="cpu")
-            gen.manual_seed(seed)
-            with patch("torch.randn", partial(torch.randn, generator=gen)):
-                images = pipe(
-                    prompt=prompt,
-                    width=width,
-                    height=height,
-                    num_inference_steps=steps,
-                    guidance_scale=cfg,
-                    lcm_origin_steps=50,
-                    output_type="pil",
-                    num_images_per_prompt=batch_size,
-                ).images
-            return Result(seed=seed, images=images)
+        for batch_idx in range(batch_count):
+            with self.progress_context(
+                f"[{batch_idx + 1}/{batch_count}] Generating {batch_size} images ({self.device}, {self.dtype})...",
+            ):
+                gen = torch.Generator(device="cpu")
+                batch_seed = seed + batch_idx
+                gen.manual_seed(batch_seed)
+                with patch("torch.randn", partial(torch.randn, generator=gen)):
+                    for in_batch_index, image in enumerate(
+                        pipe(
+                            prompt=prompt,
+                            width=width,
+                            height=height,
+                            num_inference_steps=steps,
+                            guidance_scale=cfg,
+                            lcm_origin_steps=50,
+                            output_type="pil",
+                            num_images_per_prompt=batch_size,
+                        ).images,
+                    ):
+                        yield ResultImage(
+                            seed=batch_seed,
+                            batch_num=batch_idx,
+                            batch_index=in_batch_index,
+                            batch_count=batch_count,
+                            image=image,
+                        )
